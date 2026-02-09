@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FF14 仙人微彩 策略助手</title>
+    <style>
+        :root { 
+            --gold: #d4af37; 
+            --brown: #5d4037; 
+            --coffee-light: #eaddca; /* 浅咖色背景 */
+            --card-bg: #ffffff; 
+            --accent: #e67e22; 
+        }
+        body { 
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; 
+            background: var(--coffee-light); 
+            color: var(--brown); 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            padding: 20px; 
+            margin: 0;
+        }
+        h2 { color: var(--brown); border-bottom: 3px solid var(--gold); padding-bottom: 5px; margin-bottom: 10px; }
+        .hint-box { margin-bottom: 15px; font-weight: bold; color: var(--accent); height: 24px; }
+        
+        /* 九宫格容器 */
+        .grid-container { 
+            display: grid; 
+            grid-template-columns: repeat(3, 80px); 
+            gap: 12px; 
+            padding: 20px; 
+            background: var(--brown); 
+            border-radius: 15px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
+        }
+        input { 
+            width: 80px; height: 80px; 
+            text-align: center; font-size: 36px; 
+            background: #fff; border: 3px solid transparent; 
+            border-radius: 10px; color: var(--brown); 
+            font-weight: bold; transition: 0.3s; 
+        }
+        input:focus { outline: none; border-color: var(--gold); }
+        
+        /* 仅在满足条件时高亮 */
+        input.best-line-cell { 
+            border-color: var(--gold); 
+            background: #fff9c4; 
+            animation: goldGlow 1.5s infinite; 
+        }
+        input.suggest-next { border-color: #3498db; }
+        input.error { border-color: #e74c3c; color: #e74c3c; }
+
+        @keyframes goldGlow { 
+            0% { box-shadow: 0 0 5px var(--gold); } 
+            50% { box-shadow: 0 0 20px var(--gold); } 
+            100% { box-shadow: 0 0 5px var(--gold); } 
+        }
+
+        .controls { margin: 25px; }
+        button { 
+            padding: 10px 30px; font-size: 16px; 
+            background: var(--brown); color: var(--gold); 
+            border: 2px solid var(--gold); border-radius: 25px; 
+            cursor: pointer; transition: 0.3s; font-weight: bold; 
+        }
+        button:hover { background: var(--gold); color: var(--brown); }
+
+        .results-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; }
+        .line-card { 
+            background: var(--card-bg); 
+            padding: 12px 18px; 
+            border-radius: 12px; 
+            border: 1px solid #dcdcdc; 
+            display: flex; flex-direction: column; 
+            transition: 0.4s;
+            opacity: 0.5; /* 默认未激活状态 */
+        }
+        .line-card.active { 
+            opacity: 1; 
+            border-left: 6px solid var(--gold); 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
+        }
+        .line-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+        .line-name { font-weight: bold; font-size: 15px; }
+        .line-detail { font-size: 13px; color: #888; }
+        .prob-tag { color: var(--accent); font-weight: bold; }
+
+        footer { margin-top: 40px; font-size: 14px; color: var(--brown); opacity: 0.7; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+    <h2>MINI CACTPOT PRO</h2>
+    <div class="hint-box" id="hint">请填入已揭开的数字</div>
+    
+    <div class="grid-container" id="grid">
+        <input type="number" min="1" max="9" id="idx0">
+        <input type="number" min="1" max="9" id="idx1">
+        <input type="number" min="1" max="9" id="idx2">
+        <input type="number" min="1" max="9" id="idx3">
+        <input type="number" min="1" max="9" id="idx4">
+        <input type="number" min="1" max="9" id="idx5">
+        <input type="number" min="1" max="9" id="idx6">
+        <input type="number" min="1" max="9" id="idx7">
+        <input type="number" min="1" max="9" id="idx8">
+    </div>
+
+    <div class="controls">
+        <button onclick="resetAll()">重置计算</button>
+    </div>
+
+    <div class="results-container" id="output">
+        </div>
+
+    <footer>Author: @立夏</footer>
+
+    <script>
+        const rewards = {6:10000, 7:36, 8:720, 9:360, 10:80, 11:252, 12:108, 13:72, 14:54, 15:180, 16:72, 17:180, 18:119, 19:36, 20:306, 21:1080, 22:144, 23:1800, 24:3600};
+        const lines = [
+            {n: "第一横 (上)", idx: [0,1,2]}, {n: "第二横 (中)", idx: [3,4,5]}, {n: "第三横 (下)", idx: [6,7,8]},
+            {n: "第一竖 (左)", idx: [0,3,6]}, {n: "第二竖 (中)", idx: [1,4,7]}, {n: "第三竖 (右)", idx: [2,5,8]},
+            {n: "左斜 ↘", idx: [0,4,8]}, {n: "右斜 ↙", idx: [2,4,6]}
+        ];
+
+        document.getElementById('grid').addEventListener('input', calculate);
+
+        function resetAll() {
+            document.querySelectorAll('input').forEach(i => i.value = '');
+            calculate();
+        }
+
+        function getCombos(arr, n) {
+            if (n === 0) return [[]];
+            let res = [];
+            for(let i=0; i<arr.length; i++) {
+                let rest = getCombos(arr.slice(0,i).concat(arr.slice(i+1)), n-1);
+                rest.forEach(r => res.push([arr[i], ...r]));
+            }
+            return res;
+        }
+
+        function calculate() {
+            const board = Array.from({length: 9}, (_, i) => parseInt(document.getElementById('idx'+i).value) || null);
+            const used = board.filter(v => v !== null);
+            const remaining = [1,2,3,4,5,6,7,8,9].filter(v => !used.includes(v));
+            const isReady = used.length >= 4; // 判定是否填入足够数字（通常游戏开4个数字后选线）
+
+            let hasError = false;
+            document.querySelectorAll('input').forEach((el, i) => {
+                el.classList.remove('error', 'suggest-next', 'best-line-cell');
+                if (board[i] && board.filter(v => v === board[i]).length > 1) {
+                    el.classList.add('error');
+                    hasError = true;
+                }
+            });
+            if (hasError) { document.getElementById('hint').innerText = "⚠️ 数字重复"; return; }
+
+            // 决策辅助逻辑
+            if (used.length > 0 && used.length < 4) {
+                let bestPos = -1; let maxL = -1;
+                board.forEach((v, i) => {
+                    if(v === null) {
+                        let cnt = lines.filter(l => l.idx.includes(i)).length;
+                        if(cnt > maxL) { maxL = cnt; bestPos = i; }
+                    }
+                });
+                document.getElementById('idx'+bestPos).classList.add('suggest-next');
+                document.getElementById('hint').innerText = "翻开高亮格子，计算更准确";
+            } else if (isReady) {
+                document.getElementById('hint').innerText = "数据已充足，请选择最优线";
+            } else {
+                document.getElementById('hint').innerText = "请输入数字开始计算...";
+            }
+
+            const lineResults = lines.map(line => {
+                const curValues = line.idx.map(i => board[i]);
+                const emptyCount = curValues.filter(v => v === null).length;
+                const currentSum = curValues.reduce((a, b) => a + (b || 0), 0);
+                
+                let sums = [];
+                getCombos(remaining, emptyCount).forEach(p => { 
+                    sums.push(currentSum + p.reduce((a,b) => a+b, 0)); 
+                });
+
+                let counts = {};
+                sums.forEach(s => { let m = rewards[s]; counts[m] = (counts[m] || 0) + 1; });
+                let sortedList = Object.keys(counts).map(Number).sort((a,b) => b-a).map(m => ({
+                    val: m, p: ((counts[m]/sums.length)*100).toFixed(0)+'%'
+                }));
+
+                return { 
+                    name: line.n, 
+                    exp: sums.length ? (sums.reduce((a,s)=>a+rewards[s],0)/sums.length) : 0, 
+                    min: sortedList.length ? sortedList[sortedList.length-1].val : 0, 
+                    details: sortedList, 
+                    idx: line.idx 
+                };
+            });
+
+            const topExp = isReady ? Math.max(...lineResults.map(l => l.exp)) : -1;
+
+            // 1. 满足条件才在九宫格高亮
+            if (isReady && topExp > 0) {
+                const bestLine = lineResults.find(l => l.exp === topExp);
+                bestLine.idx.forEach(i => document.getElementById('idx'+i).classList.add('best-line-cell'));
+            }
+
+            // 2 & 3. 结果位预留，但未Ready不显示具体数字
+            document.getElementById('output').innerHTML = lineResults.map(l => {
+                const isActive = isReady && l.exp === topExp;
+                return `
+                <div class="line-card ${isActive ? 'active' : ''}">
+                    <div class="line-header">
+                        <span class="line-name">${l.name}</span>
+                        <span class="line-exp">期望: <strong>${isReady ? Math.round(l.exp) : '---'}</strong> MGP</span>
+                    </div>
+                    <div class="line-detail">
+                        ${isReady ? `保底: ${l.min} | ` + l.details.map(d => `${d.val}(<span class="prob-tag">${d.p}</span>)`).join(' ') : '等待计算数据...'}
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        // 初始化占位
+        calculate();
+    </script>
+</body>
+</html>
