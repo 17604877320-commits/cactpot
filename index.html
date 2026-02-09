@@ -8,12 +8,12 @@
         :root { 
             --gold: #d4af37; 
             --brown: #5d4037; 
-            --coffee-light: #eaddca; /* 浅咖色背景 */
+            --coffee-light: #eaddca; 
             --card-bg: #ffffff; 
             --accent: #e67e22; 
         }
         body { 
-            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; 
+            font-family: 'PingFang SC', sans-serif; 
             background: var(--coffee-light); 
             color: var(--brown); 
             display: flex; 
@@ -25,7 +25,6 @@
         h2 { color: var(--brown); border-bottom: 3px solid var(--gold); padding-bottom: 5px; margin-bottom: 10px; }
         .hint-box { margin-bottom: 15px; font-weight: bold; color: var(--accent); height: 24px; }
         
-        /* 九宫格容器 */
         .grid-container { 
             display: grid; 
             grid-template-columns: repeat(3, 80px); 
@@ -44,7 +43,7 @@
         }
         input:focus { outline: none; border-color: var(--gold); }
         
-        /* 仅在满足条件时高亮 */
+        /* 九宫格高亮 */
         input.best-line-cell { 
             border-color: var(--gold); 
             background: #fff9c4; 
@@ -75,16 +74,21 @@
             border-radius: 12px; 
             border: 1px solid #dcdcdc; 
             display: flex; flex-direction: column; 
-            transition: 0.4s;
-            opacity: 0.5; /* 默认未激活状态 */
+            transition: all 0.5s ease;
+            opacity: 0.5;
         }
+        /* 置顶卡片特殊样式 */
         .line-card.active { 
             opacity: 1; 
-            border-left: 6px solid var(--gold); 
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08); 
+            border: 2px solid var(--gold);
+            border-left: 8px solid var(--gold); 
+            box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+            transform: scale(1.02);
+            z-index: 10;
         }
         .line-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
         .line-name { font-weight: bold; font-size: 15px; }
+        .line-exp { font-size: 16px; }
         .line-detail { font-size: 13px; color: #888; }
         .prob-tag { color: var(--accent); font-weight: bold; }
 
@@ -108,11 +112,10 @@
     </div>
 
     <div class="controls">
-        <button onclick="resetAll()">重置计算</button>
+        <button onclick="resetAll()">重置计算器</button>
     </div>
 
-    <div class="results-container" id="output">
-        </div>
+    <div class="results-container" id="output"></div>
 
     <footer>Author: @立夏</footer>
 
@@ -145,7 +148,7 @@
             const board = Array.from({length: 9}, (_, i) => parseInt(document.getElementById('idx'+i).value) || null);
             const used = board.filter(v => v !== null);
             const remaining = [1,2,3,4,5,6,7,8,9].filter(v => !used.includes(v));
-            const isReady = used.length >= 4; // 判定是否填入足够数字（通常游戏开4个数字后选线）
+            const isReady = used.length >= 4;
 
             let hasError = false;
             document.querySelectorAll('input').forEach((el, i) => {
@@ -157,7 +160,7 @@
             });
             if (hasError) { document.getElementById('hint').innerText = "⚠️ 数字重复"; return; }
 
-            // 决策辅助逻辑
+            // 建议逻辑
             if (used.length > 0 && used.length < 4) {
                 let bestPos = -1; let maxL = -1;
                 board.forEach((v, i) => {
@@ -168,28 +171,23 @@
                 });
                 document.getElementById('idx'+bestPos).classList.add('suggest-next');
                 document.getElementById('hint').innerText = "翻开高亮格子，计算更准确";
-            } else if (isReady) {
-                document.getElementById('hint').innerText = "数据已充足，请选择最优线";
             } else {
-                document.getElementById('hint').innerText = "请输入数字开始计算...";
+                document.getElementById('hint').innerText = isReady ? "已锁定最优路线" : "请输入数字开始计算...";
             }
 
-            const lineResults = lines.map(line => {
+            let lineResults = lines.map(line => {
                 const curValues = line.idx.map(i => board[i]);
                 const emptyCount = curValues.filter(v => v === null).length;
                 const currentSum = curValues.reduce((a, b) => a + (b || 0), 0);
-                
                 let sums = [];
                 getCombos(remaining, emptyCount).forEach(p => { 
                     sums.push(currentSum + p.reduce((a,b) => a+b, 0)); 
                 });
-
                 let counts = {};
                 sums.forEach(s => { let m = rewards[s]; counts[m] = (counts[m] || 0) + 1; });
                 let sortedList = Object.keys(counts).map(Number).sort((a,b) => b-a).map(m => ({
                     val: m, p: ((counts[m]/sums.length)*100).toFixed(0)+'%'
                 }));
-
                 return { 
                     name: line.n, 
                     exp: sums.length ? (sums.reduce((a,s)=>a+rewards[s],0)/sums.length) : 0, 
@@ -199,32 +197,32 @@
                 };
             });
 
-            const topExp = isReady ? Math.max(...lineResults.map(l => l.exp)) : -1;
-
-            // 1. 满足条件才在九宫格高亮
-            if (isReady && topExp > 0) {
-                const bestLine = lineResults.find(l => l.exp === topExp);
-                bestLine.idx.forEach(i => document.getElementById('idx'+i).classList.add('best-line-cell'));
+            // 关键逻辑：如果是 Ready 状态，则按期望收益从大到小排序
+            if (isReady) {
+                lineResults.sort((a, b) => b.exp - a.exp);
             }
 
-            // 2 & 3. 结果位预留，但未Ready不显示具体数字
-            document.getElementById('output').innerHTML = lineResults.map(l => {
-                const isActive = isReady && l.exp === topExp;
+            const topExp = isReady ? lineResults[0].exp : -1;
+
+            if (isReady && topExp > 0) {
+                lineResults[0].idx.forEach(i => document.getElementById('idx'+i).classList.add('best-line-cell'));
+            }
+
+            document.getElementById('output').innerHTML = lineResults.map((l, index) => {
+                const isActive = isReady && index === 0 && topExp > 0;
                 return `
                 <div class="line-card ${isActive ? 'active' : ''}">
                     <div class="line-header">
-                        <span class="line-name">${l.name}</span>
+                        <span class="line-name">${isActive ? '🏆 ' : ''}${l.name}</span>
                         <span class="line-exp">期望: <strong>${isReady ? Math.round(l.exp) : '---'}</strong> MGP</span>
                     </div>
                     <div class="line-detail">
-                        ${isReady ? `保底: ${l.min} | ` + l.details.map(d => `${d.val}(<span class="prob-tag">${d.p}</span>)`).join(' ') : '等待计算数据...'}
+                        ${isReady ? `保底: ${l.min} | ` + l.details.map(d => `${d.val}(<span class="prob-tag">${d.p}</span>)`).join(' ') : '等待数据...'}
                     </div>
                 </div>
                 `;
             }).join('');
         }
-
-        // 初始化占位
         calculate();
     </script>
 </body>
