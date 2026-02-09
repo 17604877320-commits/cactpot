@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>FF14 仙人微彩 策略助手</title>
     <style>
         :root { 
@@ -12,87 +12,85 @@
             --card-bg: #ffffff; 
             --accent: #e67e22; 
         }
+        * { box-sizing: border-box; }
         body { 
-            font-family: 'PingFang SC', sans-serif; 
+            font-family: 'PingFang SC', -apple-system, sans-serif; 
             background: var(--coffee-light); 
             color: var(--brown); 
             display: flex; 
             flex-direction: column; 
             align-items: center; 
-            padding: 20px; 
+            padding: 15px 10px; 
             margin: 0;
+            min-height: 100vh;
         }
-        h2 { color: var(--brown); border-bottom: 3px solid var(--gold); padding-bottom: 5px; margin-bottom: 10px; }
-        .hint-box { margin-bottom: 15px; font-weight: bold; color: var(--accent); height: 24px; }
+        h2 { font-size: 1.5rem; color: var(--brown); border-bottom: 3px solid var(--gold); padding-bottom: 5px; margin: 10px 0; }
+        .hint-box { margin-bottom: 12px; font-weight: bold; color: var(--accent); font-size: 0.9rem; height: 1.2rem; }
         
         .grid-container { 
             display: grid; 
-            grid-template-columns: repeat(3, 80px); 
-            gap: 12px; 
-            padding: 20px; 
+            grid-template-columns: repeat(3, 1fr); 
+            gap: 10px; 
+            padding: 15px; 
             background: var(--brown); 
             border-radius: 15px; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15); 
+            box-shadow: 0 8px 20px rgba(0,0,0,0.15); 
+            width: 100%;
+            max-width: 280px; /* 限制手机端最大宽度 */
         }
         input { 
-            width: 80px; height: 80px; 
-            text-align: center; font-size: 36px; 
+            width: 100%; 
+            aspect-ratio: 1 / 1; /* 保持正方形 */
+            text-align: center; font-size: 28px; 
             background: #fff; border: 3px solid transparent; 
             border-radius: 10px; color: var(--brown); 
             font-weight: bold; transition: 0.3s; 
+            -webkit-appearance: none; margin: 0;
         }
         input:focus { outline: none; border-color: var(--gold); }
         
-        /* 九宫格高亮 */
-        input.best-line-cell { 
-            border-color: var(--gold); 
-            background: #fff9c4; 
-            animation: goldGlow 1.5s infinite; 
-        }
+        input.best-line-cell { border-color: var(--gold); background: #fff9c4; animation: goldGlow 1.5s infinite; }
         input.suggest-next { border-color: #3498db; }
         input.error { border-color: #e74c3c; color: #e74c3c; }
 
         @keyframes goldGlow { 
             0% { box-shadow: 0 0 5px var(--gold); } 
-            50% { box-shadow: 0 0 20px var(--gold); } 
+            50% { box-shadow: 0 0 15px var(--gold); } 
             100% { box-shadow: 0 0 5px var(--gold); } 
         }
 
-        .controls { margin: 25px; }
+        .controls { margin: 15px 0; }
         button { 
-            padding: 10px 30px; font-size: 16px; 
+            padding: 8px 25px; font-size: 15px; 
             background: var(--brown); color: var(--gold); 
-            border: 2px solid var(--gold); border-radius: 25px; 
-            cursor: pointer; transition: 0.3s; font-weight: bold; 
+            border: 2px solid var(--gold); border-radius: 20px; 
+            cursor: pointer; font-weight: bold; 
         }
-        button:hover { background: var(--gold); color: var(--brown); }
 
-        .results-container { width: 100%; max-width: 500px; display: flex; flex-direction: column; gap: 10px; }
+        .results-container { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 8px; }
         .line-card { 
             background: var(--card-bg); 
-            padding: 12px 18px; 
-            border-radius: 12px; 
+            padding: 10px 15px; 
+            border-radius: 10px; 
             border: 1px solid #dcdcdc; 
             display: flex; flex-direction: column; 
-            transition: all 0.5s ease;
+            transition: 0.3s;
             opacity: 0.5;
         }
-        /* 置顶卡片特殊样式 */
         .line-card.active { 
             opacity: 1; 
             border: 2px solid var(--gold);
-            border-left: 8px solid var(--gold); 
-            box-shadow: 0 6px 20px rgba(0,0,0,0.12);
+            border-left: 6px solid var(--gold); 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
             transform: scale(1.02);
-            z-index: 10;
         }
-        .line-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
-        .line-name { font-weight: bold; font-size: 15px; }
-        .line-exp { font-size: 16px; }
-        .line-detail { font-size: 13px; color: #888; }
+        .line-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+        .line-name { font-weight: bold; font-size: 14px; }
+        .line-exp { font-size: 14px; }
+        .line-detail { font-size: 12px; color: #777; line-height: 1.4; }
         .prob-tag { color: var(--accent); font-weight: bold; }
 
-        footer { margin-top: 40px; font-size: 14px; color: var(--brown); opacity: 0.7; letter-spacing: 1px; }
+        footer { margin-top: 30px; font-size: 12px; color: var(--brown); opacity: 0.6; padding-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -100,15 +98,15 @@
     <div class="hint-box" id="hint">请填入已揭开的数字</div>
     
     <div class="grid-container" id="grid">
-        <input type="number" min="1" max="9" id="idx0">
-        <input type="number" min="1" max="9" id="idx1">
-        <input type="number" min="1" max="9" id="idx2">
-        <input type="number" min="1" max="9" id="idx3">
-        <input type="number" min="1" max="9" id="idx4">
-        <input type="number" min="1" max="9" id="idx5">
-        <input type="number" min="1" max="9" id="idx6">
-        <input type="number" min="1" max="9" id="idx7">
-        <input type="number" min="1" max="9" id="idx8">
+        <input type="number" pattern="[1-9]*" id="idx0">
+        <input type="number" pattern="[1-9]*" id="idx1">
+        <input type="number" pattern="[1-9]*" id="idx2">
+        <input type="number" pattern="[1-9]*" id="idx3">
+        <input type="number" pattern="[1-9]*" id="idx4">
+        <input type="number" pattern="[1-9]*" id="idx5">
+        <input type="number" pattern="[1-9]*" id="idx6">
+        <input type="number" pattern="[1-9]*" id="idx7">
+        <input type="number" pattern="[1-9]*" id="idx8">
     </div>
 
     <div class="controls">
@@ -127,7 +125,10 @@
             {n: "左斜 ↘", idx: [0,4,8]}, {n: "右斜 ↙", idx: [2,4,6]}
         ];
 
-        document.getElementById('grid').addEventListener('input', calculate);
+        document.getElementById('grid').addEventListener('input', (e) => {
+            if (e.target.value.length > 1) e.target.value = e.target.value.slice(0,1);
+            calculate();
+        });
 
         function resetAll() {
             document.querySelectorAll('input').forEach(i => i.value = '');
@@ -160,7 +161,6 @@
             });
             if (hasError) { document.getElementById('hint').innerText = "⚠️ 数字重复"; return; }
 
-            // 建议逻辑
             if (used.length > 0 && used.length < 4) {
                 let bestPos = -1; let maxL = -1;
                 board.forEach((v, i) => {
@@ -170,9 +170,9 @@
                     }
                 });
                 document.getElementById('idx'+bestPos).classList.add('suggest-next');
-                document.getElementById('hint').innerText = "翻开高亮格子，计算更准确";
+                document.getElementById('hint').innerText = "✨ 翻开蓝色边框格子";
             } else {
-                document.getElementById('hint').innerText = isReady ? "已锁定最优路线" : "请输入数字开始计算...";
+                document.getElementById('hint').innerText = isReady ? "✅ 最优路线已置顶" : "请输入数字开始...";
             }
 
             let lineResults = lines.map(line => {
@@ -197,11 +197,7 @@
                 };
             });
 
-            // 关键逻辑：如果是 Ready 状态，则按期望收益从大到小排序
-            if (isReady) {
-                lineResults.sort((a, b) => b.exp - a.exp);
-            }
-
+            if (isReady) lineResults.sort((a, b) => b.exp - a.exp);
             const topExp = isReady ? lineResults[0].exp : -1;
 
             if (isReady && topExp > 0) {
@@ -214,7 +210,7 @@
                 <div class="line-card ${isActive ? 'active' : ''}">
                     <div class="line-header">
                         <span class="line-name">${isActive ? '🏆 ' : ''}${l.name}</span>
-                        <span class="line-exp">期望: <strong>${isReady ? Math.round(l.exp) : '---'}</strong> MGP</span>
+                        <span class="line-exp">期望: <strong>${isReady ? Math.round(l.exp) : '---'}</strong></span>
                     </div>
                     <div class="line-detail">
                         ${isReady ? `保底: ${l.min} | ` + l.details.map(d => `${d.val}(<span class="prob-tag">${d.p}</span>)`).join(' ') : '等待数据...'}
